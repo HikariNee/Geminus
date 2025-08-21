@@ -1,23 +1,23 @@
 #include "connection.hpp"
-#include "utilities.hpp"
 #include "socket.hpp"
+#include "utilities.hpp"
 #include <arpa/inet.h>
+#include <gnutls/gnutls.h>
 #include <cstring>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
 #include <print>
+#include <span>
 #include <string>
 #include <variant>
-#include <botan/tls.h>
 
 enum class IP {
   IPV6,
   IPV4,
   INVALID
 };
-
 
 auto checkIP(const std::string& ip) -> IP
 {
@@ -120,7 +120,8 @@ auto createSocket(const std::string& ip) -> std::optional<Socket>
       }
 
       return true;
-    }, addr);
+    },
+        addr);
 
     if (success) {
       printDebug(std::format("Socket created, bound and set to 'listen' at \"{}\"", std::string { ipstr }));

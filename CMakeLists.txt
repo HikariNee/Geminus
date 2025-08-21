@@ -9,19 +9,21 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 FIND_PACKAGE(PkgConfig REQUIRED)
-PKG_CHECK_MODULES(BOTAN REQUIRED IMPORTED_TARGET botan-3)
+PKG_CHECK_MODULES(GNUTLS REQUIRED IMPORTED_TARGET gnutls)
 
 PROJECT(Geminus VERSION 1.0)
 
 SET(SOURCES
+  src/socket.cpp
+  src/tls/gtls_raii.cpp
   src/main.cpp
   src/utilities.cpp
   src/connection.cpp
-  src/socket.cpp
 )
 
 SET(HEADERS
   src/socket.hpp
+  src/tls/gtls_raii.hpp
   src/utilities.hpp
   src/connection.hpp
 )
@@ -29,5 +31,5 @@ SET(HEADERS
 ADD_EXECUTABLE(Geminus ${HEADERS} ${SOURCES})
 
 TARGET_COMPILE_OPTIONS(Geminus PUBLIC -Wall -Wextra -Werror)
-TARGET_LINK_LIBRARIES(Geminus PRIVATE ${BOTAN_LINK_LIBRARIES})
-TARGET_COMPILE_OPTIONS(Geminus PUBLIC ${BOTAN_CFLAGS})
+TARGET_LINK_LIBRARIES(Geminus PRIVATE ${GNUTLS_LINK_LIBRARIES})
+TARGET_COMPILE_OPTIONS(Geminus PUBLIC ${GNUTLS_CFLAGS})

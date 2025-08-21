@@ -11,25 +11,42 @@ auto Socket::sendData(const std::string& p) -> void
       p.size()));
 }
 
-auto Socket::sendData(std::span<std::byte> obj) -> void
-{
-  if (int i = send(this->sock, static_cast<void*>(obj.data()), obj.size(), 0); i == -1) {
-    if (errno == EPIPE) {
-      close(this->sock);
-    }
-    printDebug(std::string_view { std::strerror(errno) });
-  }
-};
-
 auto Socket::recvData(int bytes) -> std::optional<std::vector<std::byte>>
 {
-  std::vector<std::byte> buf {};
-  buf.resize(bytes + 1);
+  std::vector<std::byte> buf(bytes);
+
   if (int i = read(this->sock, static_cast<void*>(buf.data()), bytes); i == -1) {
     printDebug(std::string_view { std::strerror(errno) });
     return std::nullopt;
+  };
+
+  if (buf.empty()) return std::nullopt;
+  return buf;
+};
+
+auto Socket::recvDataAccurately(int bytes) -> std::optional<std::vector<std::byte>>
+{
+  std::vector<std::byte> buf(bytes);
+  size_t bytesRead {};
+
+  while (bytesRead < static_cast<size_t>(bytes)) {
+    int i = read(this->sock, static_cast<void*>(buf.data() + bytesRead), bytes - bytesRead);
+    if (i == -1) {
+      printDebug(std::string_view { std::strerror(errno) });
+      return std::nullopt;
+    };
+
+    // socket closed while reading.
+    if (i == 0) {
+      break;
+    };
+
+    bytesRead += i;
   }
 
+  buf.resize(bytesRead);
+
+  if (buf.empty()) return std::nullopt;
   return buf;
 };
 
@@ -44,6 +61,12 @@ auto Socket::acceptConn() -> std::optional<Socket>
 
   return Socket(sock);
 }
+
+auto Socket::getRawSock() -> int
+{
+  return this->sock;
+}
+
 
 auto bytesToString(const std::span<std::byte> buf) -> std::string
 {

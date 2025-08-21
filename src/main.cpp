@@ -1,24 +1,31 @@
 #include "connection.hpp"
 #include "utilities.hpp"
+#include "tls/gtls_raii.hpp"
 #include <unistd.h>
-#include <botan/block_cipher.h>
-#include <botan/hex.h>
 #include <iostream>
+#include <span>
+#include <signal.h>
+
+
 
 auto main() -> int
 {
-  auto block = Botan::hex_decode_locked("00112233445566778899AABBCCDDEEFF");
+  std::string version = gnutls_check_version(nullptr);
+  printDebug(std::format("Using GnuTLS version: {}", version));
+
+  CertStore store;
+  store.loadCredentials("./ca-cert.pem", "./ca-key.pem", true);
+
+  signal(SIGPIPE, SIG_IGN);
   // We want to crash here anyway.
   Socket sock = *createSocket();
-
+  Session<CertStore> session(store, GNUTLS_SERVER | GNUTLS_NO_SIGNAL);
   do {
-    Socket nsock;
-    if (std::optional<Socket> p = sock.acceptConn()) {
-      sock = *p;
-    }
-
-    auto msg = *sock.recvData(11);
-    sock.sendData(msg);
-
+    Socket nsock = *sock.acceptConn();
+    session.setTransport(nsock);
+    session.handshake();
+    printDebug("Handshake complete. Wohoo!");
+    auto msg = *nsock.recvData(11);
+    nsock.sendData<std::byte>(msg);
   } while (true);
 }

@@ -1,2 +1,4 @@
 build/
 cmake/
+ca-cert.pem
+ca-key.pem
