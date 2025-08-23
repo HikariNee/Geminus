@@ -23,7 +23,9 @@ SET(SOURCES
 
 SET(HEADERS
   src/socket.hpp
+  src/tls/tls.hpp
   src/tls/gtls_raii.hpp
+  src/tls/tls_errors.hpp
   src/utilities.hpp
   src/connection.hpp
 )

@@ -2,8 +2,9 @@
 #include <cstdint>
 #include <format>
 #include <iostream>
+#include <print>
 
-auto printDebug(const std::string_view str, const std::source_location location) -> void
+auto print_debug(const std::string_view str, const std::source_location location) -> void
 {
   std::string file = location.file_name();
   std::string file_name = file.substr(file.find_last_of("/") + 1);

@@ -6,19 +6,10 @@
 #include <functional>
 #include <iostream>
 #include <filesystem>
+#include <expected>
+#include "tls_errors.hpp"
 #include "../utilities.hpp"
 #include "../socket.hpp"
-
-class CertStore {
-public:
-  CertStore();
-  ~CertStore();
-  void loadCredentials(std::filesystem::path, std::filesystem::path, bool);
-  gnutls_certificate_credentials_t getCredentials();
-
-private:
-  gnutls_certificate_credentials_t cert;
-};
 
 template<typename T>
 concept Store = requires(T a)
@@ -27,28 +18,46 @@ concept Store = requires(T a)
   a.loadCredentials(std::declval<std::filesystem::path>(), std::declval<std::filesystem::path>(), bool{});
 };
 
+class CertStore {
+public:
+  CertStore();
+  ~CertStore();
+  CertStore(const CertStore&) = delete;
+  CertStore& operator=(const CertStore&) = delete;
+  CertStore(CertStore&&) = delete;
+  CertStore& operator=(CertStore&&) = delete;
+
+  void loadCredentials(const std::filesystem::path&, const std::filesystem::path&, bool);
+  gnutls_certificate_credentials_t getCredentials();
+
+private:
+  gnutls_certificate_credentials_t cert;
+};
+
 template<Store T>
 class Session {
 public:
-  Session(T store, unsigned flags)
+  Session(std::shared_ptr<T>& store, unsigned flags)
   {
     this->store = store;
     if (int i = gnutls_init(&this->session,flags); i != GNUTLS_E_SUCCESS) {
-      std::string err = gnutls_strerror(i);
+      const std::string err = gnutls_strerror(i);
       throw std::runtime_error(std::format("Could not initialize GnuTLS.", err));
     }
 
     if (int i = gnutls_set_default_priority(this->session); i != GNUTLS_E_SUCCESS) {
-      std::string err = gnutls_strerror(i);
-      printDebug(std::vformat("Setting priority failed {}", std::make_format_args(err)));
+      const std::string err = gnutls_strerror(i);
+      const std::string format_string = std::format("Setting priority failed: {}", err);
+      print_debug(format_string);
     }
 
     // TODO: Remove GNUTLS_CRD_CERTIFICATE here and make it method-agnostic
-    gnutls_certificate_credentials_t cert = store.getCredentials();
+    gnutls_certificate_credentials_t cert = store->getCredentials();
 
     if (int i = gnutls_credentials_set(this->session, GNUTLS_CRD_CERTIFICATE, cert); i != GNUTLS_E_SUCCESS) {
-      std::string err = gnutls_strerror(i);
-      printDebug(std::vformat("Setting priority failed {}", std::make_format_args(err)));
+      const std::string err = gnutls_strerror(i);
+      const std::string format_string = std::format("Setting certificate as default credential failed: {}", err);
+      print_debug(format_string);
     }
 
     gnutls_handshake_set_timeout(this->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
@@ -71,19 +80,25 @@ public:
     this->session = std::move(that.session);
   };
 
-  void handshake()
+  std::expected<void, handshake_errors> handshake(int retries)
   {
+    if (retries == 0) {
+      return std::unexpected(handshake_errors::RETRIES_EXHAUSTED);
+    }
     int i = gnutls_handshake(this->session);
     if (i < 0) {
-      std::string err = gnutls_strerror(i);
-      printDebug(std::vformat("Handshake failed: {}", std::make_format_args(err)));
-      return;
+      const std::string err = gnutls_strerror(i);
+      const std::string format_string = std::format("Handshake failed: {}", err);
+      print_debug(format_string);
+      return std::unexpected(handshake_errors::FATAL_ALERT);
     }
 
     if (gnutls_error_is_fatal(i) == 0) {
       // retry.
-      return Session::handshake();
+      return Session::handshake(retries - 1);
     }
+
+    return {};
   };
 
 
@@ -100,5 +115,5 @@ public:
 
 private:
   gnutls_session_t session;
-  T store;
+  std::shared_ptr<T> store;
 };

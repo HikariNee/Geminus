@@ -1,31 +1,30 @@
 #include "connection.hpp"
+#include "tls/tls.hpp"
 #include "utilities.hpp"
-#include "tls/gtls_raii.hpp"
-#include <unistd.h>
 #include <iostream>
-#include <span>
 #include <signal.h>
-
-
+#include <span>
+#include <unistd.h>
 
 auto main() -> int
 {
-  std::string version = gnutls_check_version(nullptr);
-  printDebug(std::format("Using GnuTLS version: {}", version));
+  const std::string version = std::format("using GnuTLS Version: {}", gnutls_check_version(nullptr));
+  print_debug(version);
 
-  CertStore store;
-  store.loadCredentials("./ca-cert.pem", "./ca-key.pem", true);
+  std::shared_ptr<CertStore> store = std::make_shared<CertStore>();
+  store->loadCredentials("./ca-cert.pem", "./ca-key.pem", true);
 
   signal(SIGPIPE, SIG_IGN);
   // We want to crash here anyway.
   Socket sock = *createSocket();
   Session<CertStore> session(store, GNUTLS_SERVER | GNUTLS_NO_SIGNAL);
+
   do {
     Socket nsock = *sock.acceptConn();
     session.setTransport(nsock);
-    session.handshake();
-    printDebug("Handshake complete. Wohoo!");
-    auto msg = *nsock.recvData(11);
-    nsock.sendData<std::byte>(msg);
+    if (auto p = session.handshake(3); !p.has_value()) {
+      continue;
+    }
+
   } while (true);
 }

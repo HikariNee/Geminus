@@ -1,10 +1,13 @@
 #include "connection.hpp"
 #include "socket.hpp"
 #include "utilities.hpp"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include <arpa/inet.h>
-#include <gnutls/gnutls.h>
 #include <cstring>
 #include <functional>
+#include <gnutls/gnutls.h>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -41,7 +44,7 @@ auto createSocket(const std::string& ip) -> std::optional<Socket>
 
   // return early if the IP is invalid.
   if (iptype == IP::INVALID) {
-    printDebug("IP provided was neither in the IPV4 or IPV6 format");
+    print_debug("IP provided was neither in the IPV4 or IPV6 format");
     return std::nullopt;
   }
 
@@ -54,7 +57,7 @@ auto createSocket(const std::string& ip) -> std::optional<Socket>
   hints.ai_protocol = 0;
 
   if (int status = getaddrinfo(ip.c_str(), "1965", &hints, &res_); status != 0) {
-    printDebug(gai_strerror(status));
+    print_debug(gai_strerror(status));
     return std::nullopt;
   }
 
@@ -77,27 +80,27 @@ auto createSocket(const std::string& ip) -> std::optional<Socket>
 
     // if a socket could not be created, try the other structures.
     if (sock == -1) {
-      printDebug(std::string_view { std::strerror(errno) });
+      print_debug(std::string_view { std::strerror(errno) });
       continue;
     }
 
     // why the fuck do I have to do it this way man.
     int opt = 1;
     if (int i = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, static_cast<const void*>(&opt), sizeof(opt)); i == -1) {
-      printDebug(std::string_view { std::strerror(errno) });
+      print_debug(std::string_view { std::strerror(errno) });
       return std::nullopt;
     }
 
     // socket was successfully created, try binding it.
     if (int i = bind(sock, p->ai_addr, p->ai_addrlen); i == -1) {
-      printDebug(std::string_view { std::strerror(errno) });
+      print_debug(std::string_view { std::strerror(errno) });
       ;
       return std::nullopt;
     }
 
     // make it a apassive socket
     if (int i = listen(sock, 1024); i == -1) {
-      printDebug(std::string_view { std::strerror(errno) });
+      print_debug(std::string_view { std::strerror(errno) });
       return std::nullopt;
     }
 
@@ -107,14 +110,14 @@ auto createSocket(const std::string& ip) -> std::optional<Socket>
 
       if constexpr (std::is_same_v<T, sockaddr_in6>) {
         if (const char* s = inet_ntop(family, static_cast<const void*>(&(arg.sin6_addr)), ipstr, sizeof(ipstr)); s == nullptr) {
-          printDebug(std::string_view { std::strerror(errno) });
+          print_debug(std::string_view { std::strerror(errno) });
           return false;
         };
       }
 
       if constexpr (std::is_same_v<T, sockaddr_in>) {
         if (const char* s = inet_ntop(family, static_cast<const void*>(&(arg.sin_addr)), ipstr, sizeof(ipstr)); s == nullptr) {
-          printDebug(std::string_view { std::strerror(errno) });
+          print_debug(std::string_view { std::strerror(errno) });
           return false;
         };
       }
@@ -124,7 +127,8 @@ auto createSocket(const std::string& ip) -> std::optional<Socket>
         addr);
 
     if (success) {
-      printDebug(std::format("Socket created, bound and set to 'listen' at \"{}\"", std::string { ipstr }));
+      const std::string format_string = std::format("Socket created, bound and set to 'listen' at \"{}\"", std::string { ipstr });
+      print_debug(format_string);
       return Socket(sock);
     }
   }
