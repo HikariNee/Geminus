@@ -1,20 +1,20 @@
-#include "connection.hpp"
-#include "socket.hpp"
-#include "utilities.hpp"
+module;
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <cstring>
-#include <functional>
 #include <gnutls/gnutls.h>
-#include <iostream>
-#include <memory>
 #include <optional>
-#include <print>
-#include <span>
 #include <string>
 #include <variant>
+#include <format>
+#include <memory>
+
+export module Connection;
+import Socket;
+import Utils;
 
 enum class IP {
   IPV6,
@@ -38,7 +38,7 @@ auto checkIP(const std::string& ip) -> IP
   return IP::INVALID;
 }
 
-auto createSocket(const std::string& ip) -> std::optional<Socket>
+export auto createSocket(const std::string& ip = "127.0.0.1") -> std::optional<Socket>
 {
   IP iptype = checkIP(ip);
 
@@ -109,14 +109,14 @@ auto createSocket(const std::string& ip) -> std::optional<Socket>
       using T = std::decay_t<decltype(arg)>;
 
       if constexpr (std::is_same_v<T, sockaddr_in6>) {
-        if (const char* s = inet_ntop(family, static_cast<const void*>(&(arg.sin6_addr)), ipstr, sizeof(ipstr)); s == nullptr) {
+        if (const char* s = inet_ntop(family, static_cast<const void*>(&(arg.sin6_addr)), ipstr, sizeof(ipstr)); !s) {
           print_debug(std::string_view { std::strerror(errno) });
           return false;
         };
       }
 
       if constexpr (std::is_same_v<T, sockaddr_in>) {
-        if (const char* s = inet_ntop(family, static_cast<const void*>(&(arg.sin_addr)), ipstr, sizeof(ipstr)); s == nullptr) {
+        if (const char* s = inet_ntop(family, static_cast<const void*>(&(arg.sin_addr)), ipstr, sizeof(ipstr)); !s) {
           print_debug(std::string_view { std::strerror(errno) });
           return false;
         };

@@ -1,13 +1,29 @@
-#include "socket.hpp"
-#include "utilities.hpp"
+module;
+
 #include <cstring>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <optional>
 
-Socket::~Socket()
-{
-  close(this->sock);
-}
+export module Socket;
+import Utils;
+
+export class Socket;
+
+class Socket {
+  public:
+  Socket()
+      : sock(0) { };
+  Socket(int fd)
+      : sock(fd) { };
+  //~Socket();
+
+  std::optional<Socket> acceptConn();
+  int getRawSock();
+
+  private:
+  int sock;
+};
 
 auto Socket::acceptConn() -> std::optional<Socket>
 {

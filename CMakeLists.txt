@@ -1,5 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.15)
-INCLUDE(FetchContent)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.31)
 
 SET(CMAKE_CXX_STANDARD 23)
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -13,25 +12,16 @@ PKG_CHECK_MODULES(GNUTLS REQUIRED IMPORTED_TARGET gnutls)
 
 PROJECT(Geminus VERSION 1.0)
 
-SET(SOURCES
-  src/socket.cpp
-  src/tls/gtls_raii.cpp
-  src/main.cpp
-  src/utilities.cpp
-  src/connection.cpp
-)
-
-SET(HEADERS
-  src/socket.hpp
-  src/tls/tls.hpp
-  src/tls/gtls_raii.hpp
-  src/tls/tls_errors.hpp
-  src/utilities.hpp
-  src/connection.hpp
-)
-
 ADD_EXECUTABLE(Geminus ${HEADERS} ${SOURCES})
-
+TARGET_SOURCES(Geminus PRIVATE src/main.cpp)
+TARGET_SOURCES(Geminus PRIVATE
+  FILE_SET modules TYPE CXX_MODULES FILES
+  src/tls/tls.cppm
+  src/tls/tls_errors.cppm
+  src/utilities.cppm
+  src/socket.cppm
+  src/connection.cppm
+)
 TARGET_COMPILE_OPTIONS(Geminus PUBLIC -Wall -Wextra -Werror)
 TARGET_LINK_LIBRARIES(Geminus PRIVATE ${GNUTLS_LINK_LIBRARIES})
 TARGET_COMPILE_OPTIONS(Geminus PUBLIC ${GNUTLS_CFLAGS})
