@@ -1,18 +1,15 @@
 module;
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
+#include <cerrno>
 #include <arpa/inet.h>
-#include <cstring>
 #include <gnutls/gnutls.h>
-#include <optional>
-#include <string>
-#include <variant>
-#include <format>
-#include <memory>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
 export module Connection;
+import std;
+import std.compat;
 import Socket;
 import Utils;
 

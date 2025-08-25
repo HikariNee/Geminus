@@ -1,11 +1,5 @@
-module;
-
-#include <cstdint>
-#include <format>
-#include <iostream>
-#include <source_location>
-
 export module Utils;
+import std;
 
 export auto print_debug(const std::string_view str, const std::source_location location = std::source_location::current()) -> void
 {
