@@ -1,11 +1,14 @@
+#include <gnutls/gnutls.h>
 #include <signal.h>
 #include <unistd.h>
 
 import std;
 import TLS;
+import TLS_Errors;
 import Utils;
 import Socket;
 import Connection;
+import Gemini;
 
 auto main() -> int
 {
@@ -19,15 +22,29 @@ auto main() -> int
 
   // We want to crash here anyway.
   Socket sock = *createSocket();
-  TLS::Session<TLS::CertStore> session(store, GNUTLS_SERVER | GNUTLS_NO_SIGNAL);
 
   do {
-    std::optional<Socket> nsock = sock.acceptConn();
+    TLS::Session<TLS::CertStore> session(store, GNUTLS_SERVER | GNUTLS_NO_SIGNAL);
+    std::optional<std::pair<Socket, sockaddr>> nsock = sock.acceptConn();
+
     if (nsock.has_value()) {
-      Socket newsock = nsock.value();
+      auto [newsock, addr] = nsock.value();
       session.setTransport(newsock);
-      if (auto p = session.handshake(3); !p.has_value()) {
-        continue;
+      auto handshake = session.handshake(3);
+
+      if (handshake.has_value()) {
+        auto retbuf = session.recv(4).value();
+        std::cout << buf_to_string(retbuf) << std::endl;
+
+      } else {
+        switch (handshake.error()) {
+        case handshake_errors::RETRIES_EXHAUSTED:
+          std::cout << "retries died." << '\n';
+          break;
+        case handshake_errors::FATAL_ALERT:
+          std::cout << "Fatal alert died." << '\n';
+          break;
+        }
       }
     }
   } while (true);

@@ -13,12 +13,6 @@ import std.compat;
 import Socket;
 import Utils;
 
-enum class IP {
-  IPV6,
-  IPV4,
-  INVALID
-};
-
 auto checkIP(const std::string& ip) -> IP
 {
   struct in_addr ipv4addr {};
@@ -126,7 +120,7 @@ export auto createSocket(const std::string& ip = "127.0.0.1") -> std::optional<S
     if (success) {
       const std::string format_string = std::format("Socket created, bound and set to 'listen' at \"{}\"", std::string { ipstr });
       print_debug(format_string);
-      return Socket(sock);
+      return Socket(sock, iptype);
     }
   }
 

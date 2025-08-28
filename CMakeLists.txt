@@ -7,7 +7,7 @@ SET(CMAKE_CXX_STANDARD_REQUIRED OFF)
 SET(CMAKE_CXX_MODULE_STD 1)
 
 if(NOT CMAKE_BUILD_TYPE)
-  Set(CMAKE_BUILD_TYPE Release)
+  SET(CMAKE_BUILD_TYPE Release)
 endif()
 
 FIND_PACKAGE(PkgConfig REQUIRED)
@@ -24,6 +24,8 @@ TARGET_SOURCES(Geminus PRIVATE
   src/utilities.cppm
   src/socket.cppm
   src/connection.cppm
+  src/gemini/gemini.cppm
+  src/gemini/gemini_errors.cppm
 )
 TARGET_COMPILE_OPTIONS(Geminus PUBLIC -Wall -Wextra -Werror)
 TARGET_LINK_LIBRARIES(Geminus PRIVATE ${GNUTLS_LINK_LIBRARIES})

@@ -11,7 +11,7 @@ import Socket;
 export using enum gnutls_init_flags_t;
 export class CertStore;
 
-template<typename T>
+export template<typename T>
 concept Store = requires(T a)
 {
   a.getCredentials();
@@ -83,6 +83,9 @@ export namespace TLS {
     Session(Session&&) = delete;
     std::expected<void, handshake_errors> handshake(int retries);
     void setTransport(Socket sock);
+    std::expected<void, transport_errors> send(const std::string&);
+    std::expected<std::vector<std::byte>, transport_errors> recv(std::size_t);
+
     ~Session();
 
   private:
@@ -124,17 +127,19 @@ export namespace TLS {
     if (retries == 0) {
       return std::unexpected(handshake_errors::RETRIES_EXHAUSTED);
     }
+
     int i = gnutls_handshake(this->session);
-    if (i < 0) {
+
+    // non fatal errors.
+    if (i == GNUTLS_E_AGAIN || i == GNUTLS_E_INTERRUPTED || i == GNUTLS_E_WARNING_ALERT_RECEIVED) {
+      return Session::handshake(retries - 1);
+    }
+
+    if (gnutls_error_is_fatal(i) != 0) {
       const std::string err = gnutls_strerror(i);
       const std::string format_string = std::format("Handshake failed: {}", err);
       print_debug(format_string);
       return std::unexpected(handshake_errors::FATAL_ALERT);
-    }
-
-    if (gnutls_error_is_fatal(i) == 0) {
-      // retry.
-      return Session::handshake(retries - 1);
     }
 
     return {};
@@ -148,9 +153,64 @@ export namespace TLS {
   };
 
   template<Store T>
+  auto Session<T>::send(const std::string& str) -> std::expected<void, transport_errors>
+  {
+    std::uint64_t bytesSent = 0;
+    while (bytesSent != str.size()) {
+      ssize_t ret = gnutls_record_send(this->session, reinterpret_cast<const void*>(str.data() + bytesSent), str.size() - bytesSent);
+
+      // fatal error. Terminate the session.
+      if (gnutls_error_is_fatal(ret) != 0) {
+	gnutls_bye(this->session, GNUTLS_SHUT_RDWR);
+	return std::unexpected(transport_errors::FATAL_ALERT);
+      }
+
+      // Send interrupted, resend.
+      if (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) {
+	ret = gnutls_record_send(this->session, reinterpret_cast<const void*>(str.data() + bytesSent), str.size() - bytesSent);
+      }
+
+      if (ret < 0) {
+	return std::unexpected(transport_errors::NON_FATAL_ALERT);
+      }
+
+      bytesSent += ret;
+    }
+
+    return {};
+  }
+
+  template<Store T>
+  auto Session<T>::recv(size_t bytes) -> std::expected<std::vector<std::byte>, transport_errors>
+  {
+    std::vector<std::byte> retbuf {};
+    retbuf.resize(bytes);
+
+    ssize_t ret = gnutls_record_recv(this->session, retbuf.data(), bytes);
+
+    // fatal error. Terminate the session.
+    if (gnutls_error_is_fatal(ret) != 0) {
+      gnutls_bye(this->session, GNUTLS_SHUT_RDWR);
+      return std::unexpected(transport_errors::FATAL_ALERT);
+    }
+
+    if (ret == GNUTLS_E_REHANDSHAKE) {
+      if (auto p = Session<T>::handshake(3); !p.has_value()) {
+        return std::unexpected(transport_errors::FATAL_ALERT);
+      }
+    }
+
+    // recv interrupted, resend.
+    if (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) {
+      ret = gnutls_record_recv(this->session, retbuf.data(), bytes);
+    }
+
+    return retbuf;
+  }
+
+  template<Store T>
   Session<T>::~Session()
   {
     gnutls_deinit(session);
   };
-
 }
